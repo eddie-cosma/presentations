@@ -1,0 +1,1527 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comparing Transformation Frameworks: dbt vs. SQLMesh</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reset.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/theme/white.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <style>
+    /* ---------- Minimal black-on-white ---------- */
+    :root {
+      --rule: #000;
+      --muted: #666;
+      --faint: #ccc;
+    }
+
+    .reveal {
+      color: #000;
+      font-size: 30px;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    .reveal .slides {
+      text-align: left;
+    }
+
+    .reveal h1,
+    .reveal h2,
+    .reveal h3,
+    .reveal h4 {
+      color: #000;
+      text-transform: none;
+      text-align: left;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .reveal h1 { font-size: 1.85em; }
+    .reveal h2 { font-size: 1.3em; margin-bottom: 0.45em; }
+    .reveal h3 { font-size: 1.0em; }
+
+    /* A hairline under section headings keeps things structured without color */
+    .reveal h2.ruled {
+      border-bottom: 2px solid var(--rule);
+      padding-bottom: 0.2em;
+    }
+
+    .reveal a,
+    .reveal a:hover {
+      color: #000;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .reveal ul,
+    .reveal ol {
+      display: block;
+      margin-left: 1.1em;
+    }
+
+    .reveal li {
+      margin-bottom: 0.35em;
+      line-height: 1.3;
+    }
+
+    .reveal li ul li {
+      font-size: 0.85em;
+      color: #333;
+    }
+
+    .reveal p { text-align: left; }
+
+    .reveal em { font-style: italic; }
+
+    .reveal strong { font-weight: 700; }
+
+    .reveal section img {
+      border: none;
+      box-shadow: none;
+      background: none;
+      display: block;
+      margin: 0.4em auto;
+    }
+
+    /* ---------- Code ---------- */
+    .reveal pre {
+      width: 100%;
+      box-shadow: none;
+      border: 1px solid var(--faint);
+      font-size: 0.62em;
+      margin: 0.4em 0;
+      text-align: left;
+    }
+
+    .reveal pre code {
+      max-height: 540px;
+      padding: 0.8em 1em;
+      background: #fafafa;
+      line-height: 1.35;
+      text-align: left;
+    }
+
+    /* highlight.js line numbers render as a table -- keep the content-table
+       styles below from leaking into them */
+    .reveal pre code table,
+    .reveal pre code tbody,
+    .reveal pre code tr,
+    .reveal pre code td {
+      border: none;
+      background: none;
+      padding: 0;
+      width: auto;
+      font-weight: 400;
+      line-height: inherit;
+      text-align: left;
+    }
+
+    .reveal pre code td.hljs-ln-numbers { padding-right: 1em; }
+
+    .reveal code:not(pre code) {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.9em;
+      background: #f0f0f0;
+      padding: 0.05em 0.3em;
+      border-radius: 2px;
+    }
+
+    .small-code pre { font-size: 0.52em; }
+
+    /* ---------- Layout helpers ---------- */
+    .cols {
+      display: flex;
+      gap: 1.6em;
+      align-items: flex-start;
+    }
+
+    .cols > * { flex: 1; min-width: 0; }
+
+    .cols.tight { gap: 1em; }
+
+    .note {
+      border-left: 3px solid #000;
+      padding: 0.35em 0.9em;
+      margin: 0.7em 0;
+      font-size: 0.85em;
+      background: #f6f6f6;
+    }
+
+    .kicker {
+      font-size: 0.6em;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.2em;
+    }
+
+    .lead { font-size: 1.05em; }
+
+    .small { font-size: 0.75em; }
+
+    .smaller { font-size: 0.62em; }
+
+    .source {
+      font-size: 0.45em;
+      color: var(--muted);
+      margin-top: 1em;
+    }
+
+    /* Slides are top-aligned (center: false) so headings sit at a fixed height
+       from slide to slide; divider slides opt back into vertical centering. */
+    .reveal .slides > section.center {
+      text-align: center;
+      min-height: 680px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .reveal .center h1,
+    .reveal .center h2,
+    .reveal .center h3,
+    .reveal .center p { text-align: center; }
+
+    /* ---------- Tables ---------- */
+    .reveal section > table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.64em;
+      margin-top: 0.3em;
+    }
+
+    .reveal section > table th,
+    .reveal section > table td {
+      border: none;
+      border-bottom: 1px solid var(--faint);
+      padding: 0.42em 0.6em;
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.25;
+    }
+
+    .reveal section > table th {
+      border-bottom: 2px solid #000;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .reveal section > table td:first-child { font-weight: 700; width: 22%; }
+
+    /* ---------- Timeline ---------- */
+    .timeline {
+      list-style: none;
+      margin: 0 0 0 0.2em;
+      padding: 0 0 0 1.5em;
+      border-left: 2px solid #000;
+    }
+
+    .timeline li {
+      position: relative;
+      margin: 0 0 0.6em 0;
+      font-size: 0.68em;
+      line-height: 1.25;
+      list-style: none;
+    }
+
+    .timeline li::before {
+      content: "";
+      position: absolute;
+      left: -1.9em;
+      top: 0.28em;
+      width: 0.62em;
+      height: 0.62em;
+      border-radius: 50%;
+      background: #000;
+    }
+
+    .timeline li.hollow::before {
+      background: #fff;
+      border: 2px solid #000;
+      left: -1.98em;
+    }
+
+    .timeline .date {
+      display: block;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .timeline .what { color: #333; }
+
+    .era {
+      font-size: 0.55em;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--faint);
+      padding-bottom: 0.25em;
+      margin-bottom: 0.7em;
+    }
+
+    /* ---------- Diagram boxes ---------- */
+    .layer {
+      border: 1px solid #000;
+      padding: 0.5em 0.7em;
+      margin-bottom: 0.5em;
+    }
+
+    .layer h4 {
+      font-size: 0.6em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin: 0 0 0.4em 0;
+      color: var(--muted);
+    }
+
+    .obj {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.6em;
+      border: 1px solid #999;
+      padding: 0.28em 0.5em;
+      margin: 0.22em 0;
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .obj.ghost { border-style: dashed; color: #888; }
+
+    .arrow {
+      font-size: 0.7em;
+      text-align: center;
+      color: #000;
+    }
+
+    .stack { display: flex; flex-direction: column; justify-content: center; }
+
+    /* the arrow between the two layers should not claim an equal column */
+    .cols > .stack.arrow { flex: 0 0 2.5em; }
+
+    .reveal .slide-number { color: #666; background: none; font-size: 0.5em; }
+  </style>
+</head>
+
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- ================= TITLE ================= -->
+      <section class="center">
+        <h1>Comparing Transformation Frameworks</h1>
+        <h3 style="margin-bottom:1.5em;">dbt vs. SQLMesh</h3>
+        <p style="font-size:0.8em;">Eddie Cosma</p>
+        <p style="font-size:0.8em;">CLEpy Meetup &ndash; August 11, 2026</p>
+        <aside class="notes">
+          Target: ~45 minutes. Roughly 8 min fundamentals, 12 min dbt, 4 min history,
+          13 min SQLMesh, 5 min comparison/conclusions, plus demos and Q&amp;A.
+        </aside>
+      </section>
+
+      <!-- ================= OVERVIEW ================= -->
+      <section>
+        <h2 class="ruled">Overview</h2>
+        <ul>
+          <li class="fragment">Transformation framework basics</li>
+          <li class="fragment">Overview of dbt</li>
+          <li class="fragment">History of popular frameworks</li>
+          <li class="fragment">Overview of SQLMesh</li>
+          <li class="fragment">Demos</li>
+        </ul>
+        <aside class="notes">
+          Set expectations: this is not a "dbt is dead" talk. It's about two different
+          philosophies of what a transformation framework should be responsible for.
+        </aside>
+      </section>
+
+      <!-- ================= PART 1: BASICS ================= -->
+      <section class="center">
+        <p class="kicker" style="text-align:center;">Part 1</p>
+        <h1>Transformation basics</h1>
+      </section>
+
+      <section>
+        <h2 class="ruled">What is data integration?</h2>
+        <ul>
+          <li>Data transformation is part of <strong>data integration</strong></li>
+          <li>Raw data is <strong>extracted</strong> from disparate sources</li>
+          <li>Extracted data is <strong>loaded</strong> into an accessible location (e.g., database, flat files)</li>
+          <li>Data is <strong>transformed</strong> into a usable format</li>
+        </ul>
+        <img src="assets/etl-diagram.png" style="width:52%; margin-top:0.3em;" alt="Three data sources feeding an ETL process that loads a data warehouse">
+        <aside class="notes">
+          The classic picture. Note the ordering assumption baked into the acronym.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">ETL or ELT?</h2>
+        <p>Transform can come <em>before</em> or <em>after</em> load.</p>
+        <div class="cols">
+          <div>
+            <h3>ETL</h3>
+            <ul class="small">
+              <li>Transform in flight, in a separate compute layer</li>
+              <li>Warehouse only ever sees clean data</li>
+              <li>Expensive to re-run; source data not retained</li>
+            </ul>
+          </div>
+          <div>
+            <h3>ELT</h3>
+            <ul class="small">
+              <li>Land raw data first, transform <em>in</em> the warehouse</li>
+              <li>Cheap storage + elastic compute made this the default</li>
+              <li>Raw data stays available to re-transform</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note fragment">
+          dbt and SQLMesh are both <strong>the &ldquo;T&rdquo; in ELT</strong>. They assume your data is already
+          in a warehouse and they push work down to that warehouse as SQL.
+        </div>
+        <aside class="notes">
+          Important framing: neither tool moves data. Neither is an ingestion tool.
+          They generate and execute SQL against a warehouse you already have.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">What is data transformation?</h2>
+        <p>Doing whatever you need to do to your data to make it usable for reporting or
+          downstream applications. E.g.,</p>
+        <ul>
+          <li>Cleaning up bad or missing data</li>
+          <li>Joining multiple raw datasets</li>
+          <li>Deriving new data</li>
+          <li>Translating coded values</li>
+          <li>Fixing data types (like dates encoded as strings)</li>
+          <li>Many more&hellip;</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="ruled">Use cases for data transformation</h2>
+        <ul>
+          <li><strong>Business intelligence</strong> &ndash; dashboards, reporting</li>
+          <li><strong>Data warehousing</strong> &ndash; turning raw source tables into a coherent model</li>
+          <li><strong>Machine learning</strong></li>
+          <li><strong>Data migration</strong> &ndash; reshaping data to fit a new system's schema</li>
+        </ul>
+        <p class="source">Source: <a href="https://www.ibm.com/think/topics/data-transformation">ibm.com/think/topics/data-transformation</a></p>
+      </section>
+
+      <section>
+        <h2 class="ruled">Data transformation steps</h2>
+        <ul>
+          <li><strong>Data discovery</strong> &ndash; understanding dataset structure, characteristics</li>
+          <li><strong>Data mapping</strong> &ndash; defining how individual fields fit into final output</li>
+          <li><strong>Code generation</strong> &ndash; defining executable code to actually transform data</li>
+          <li><strong>Code execution</strong> &ndash; executing the generated code</li>
+          <li><strong>Data review</strong> &ndash; make sure it all went right</li>
+        </ul>
+        <div class="note">
+          We are primarily concerned with <strong>code generation</strong> and <strong>code execution</strong>.
+        </div>
+      </section>
+
+      <section>
+        <h2 class="ruled">A word about transformation tools</h2>
+        <p>All kinds of technologies can be used to transform data&hellip;</p>
+        <ul>
+          <li class="fragment"><code>awk</code> can transform data</li>
+          <li class="fragment"><code>vim</code> can transform data</li>
+          <li class="fragment">Excel can transform data</li>
+          <li class="fragment">pandas can transform data</li>
+          <li class="fragment">Regular expressions can transform data</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="ruled">Important considerations</h2>
+        <p>To be robust, transformation workflows should be:</p>
+        <ul>
+          <li><strong>Validatable</strong> (testable)</li>
+          <li><strong>Repeatable</strong> (consistent)</li>
+          <li><strong>Automatable</strong> (fast)</li>
+          <li><strong>Iterable</strong> (code-based and version tracked)</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="ruled">Popular frameworks</h2>
+        <p class="small">Frameworks developed to make transformations fit our criteria</p>
+        <div class="cols">
+          <div>
+            <h3>SQL-based</h3>
+            <ul class="small">
+              <li>Data build tool (dbt)</li>
+              <li>SQLMesh</li>
+              <li>Dataform</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Python-native</h3>
+            <ul class="small">
+              <li>Dagster</li>
+              <li>Prefect</li>
+              <li>Kedro</li>
+              <li>Ibis</li>
+            </ul>
+          </div>
+        </div>
+        <p class="small" style="margin-top:0.6em;">Again, there are many more&hellip;</p>
+        <p class="fragment lead"><strong>We are going to focus on dbt and SQLMesh.</strong></p>
+        <aside class="notes">
+          Worth noting the Python-native list blurs the line between transformation and
+          orchestration &mdash; Dagster and Prefect are orchestrators that can transform.
+        </aside>
+      </section>
+
+      <!-- ================= PART 2: dbt ================= -->
+      <section class="center">
+        <p class="kicker" style="text-align:center;">Part 2</p>
+        <h1>dbt</h1>
+      </section>
+
+      <section>
+        <h2 class="ruled">What is dbt?</h2>
+        <ul>
+          <li><strong>Data build tool</strong> &mdash; the transformation layer of the &ldquo;modern data stack&rdquo;</li>
+          <li>Started in 2016; effectively the <strong>default</strong> answer for SQL transformation today</li>
+          <li>A Python CLI that turns a directory of <code>SELECT</code> statements into a
+            dependency-ordered set of tables and views in your warehouse</li>
+          <li>Brings software engineering practice to analytics:
+            <ul>
+              <li>version control</li>
+              <li>code review</li>
+              <li>environments</li>
+              <li>tests</li>
+              <li>documentation</li>
+              <li>modularity</li>
+            </ul></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt basics: the model</h2>
+        <p>A <strong>model</strong> is one <code>.sql</code> file containing one <code>SELECT</code>. The file name is the table name.</p>
+        <pre><code class="language-sql" data-trim data-line-numbers>
+-- models/staging/stg_orders.sql
+
+select
+    id                  as order_id,
+    user_id             as customer_id,
+    order_date,
+    status,
+    amount_cents / 100.0 as amount_usd
+from raw.orders
+where status != 'deleted'
+        </code></pre>
+        <p class="fragment small">dbt wraps this in DDL for you</p>
+        <pre class="fragment"><code class="language-sql" data-trim>
+create or replace view analytics.stg_orders as (
+    select ... /* your SELECT, verbatim */
+);
+        </code></pre>
+      </section>
+
+      <!-- <section>
+        <h2 class="ruled">dbt basics: project layout</h2>
+        <pre><code class="language-text" data-trim data-line-numbers="1-3|4-9|10-12|13-16">
+jaffle_shop/
+├── dbt_project.yml          # project config
+├── profiles.yml             # warehouse credentials
+├── models/
+│   ├── staging/
+│   │   ├── stg_orders.sql
+│   │   ├── stg_customers.sql
+│   │   └── _sources.yml     # declares raw.* source tables
+│   └── marts/
+│       ├── fct_orders.sql
+│       └── _models.yml      # descriptions + tests
+├── macros/                  # reusable Jinja functions
+├── seeds/                   # small CSVs loaded as tables
+├── snapshots/               # slowly changing dimension capture
+└── tests/                   # custom SQL assertions
+        </code></pre>
+      </section> -->
+
+      <section>
+        <h2 class="ruled">dbt templating: Jinja</h2>
+        <p>dbt files are <strong>Jinja templates that happen to contain SQL</strong>. Before execution,
+          dbt renders the template into a plain SQL string.</p>
+        <table>
+          <tr><th>Syntax</th><th>Meaning</th></tr>
+          <tr><td>{{ ... }}</td><td>Expression &mdash; renders a value into the SQL</td></tr>
+          <tr><td>{% ... %}</td><td>Statement &mdash; control flow, macro definitions, no output</td></tr>
+          <tr><td>{# ... #}</td><td>Comment &mdash; stripped before compilation</td></tr>
+        </table>
+        <div class="note fragment">
+          Jinja is <strong>string templating</strong>.
+        </div>
+        <aside class="notes">
+          Same templating engine as Flask/Django-ish templates. It's textual substitution.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Jinja: <code>ref</code> and <code>source</code></h2>
+        <p>Two functions do most of the work in a real dbt project.</p>
+        <pre><code class="language-sql" data-trim data-line-numbers="1-5|7-11">
+-- staging model reads a RAW table via source()
+select *
+from {{ source('jaffle', 'orders') }}
+
+-- compiles to: from raw_jaffle.orders
+
+-- downstream model reads another MODEL via ref()
+select *
+from {{ ref('stg_orders') }}
+
+-- compiles to: from analytics_dev_eddie.stg_orders
+        </code></pre>
+        <ul class="fragment small">
+          <li><code>ref()</code> returns the <em>right</em> name for the current environment (dev vs. prod)</li>
+          <li><code>ref()</code> is also how dbt discovers the DAG</li>
+        </ul>
+        <aside class="notes">
+          Key insight: the dependency graph is a side effect of a templating function.
+          dbt knows model A depends on model B, but not which *columns* flow between them.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Jinja: macros</h2>
+        <p>A macro is a function that returns a SQL fragment. This is dbt's abstraction mechanism.</p>
+        <pre><code class="language-sql" data-trim data-line-numbers="1-5|7-12">
+-- macros/cents_to_dollars.sql
+{% macro cents_to_dollars(column_name, precision=2) %}
+    round({{ column_name }} / 100.0, {{ precision }})
+{% endmacro %}
+
+-- models/staging/stg_payments.sql
+select
+    payment_id,
+    {{ cents_to_dollars('amount') }} as amount_usd,
+    {{ cents_to_dollars('tip') }}    as tip_usd
+from {{ source('stripe', 'payments') }}
+        </code></pre>
+      </section>
+
+      <section>
+        <h2 class="ruled">Jinja: control flow</h2>
+        <p>Because it's a full templating language, you can generate SQL programmatically.</p>
+        <pre><code class="language-sql" data-trim data-line-numbers>
+{% set payment_methods = ['credit_card', 'paypal', 'bank_transfer'] %}
+
+select
+    order_id,
+    {% for method in payment_methods %}
+    sum(case when payment_method = '{{ method }}'
+             then amount_usd else 0 end) as {{ method }}_amount
+    {%- if not loop.last %},{% endif %}
+    {% endfor %}
+from {{ ref('stg_payments') }}
+group by 1
+        </code></pre>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt basics: materializations</h2>
+        <p>The same <code>SELECT</code> becomes a different physical object depending on config.</p>
+        <table>
+          <tr><th>Materialization</th><th>What dbt does</th></tr>
+          <tr><td>view</td><td><code>CREATE VIEW</code></td></tr>
+          <tr><td>table</td><td><code>CREATE TABLE AS</code>, dropped and rebuilt each run</td></tr>
+          <tr><td>incremental</td><td>Insert/merge only new rows</td></tr>
+          <tr><td>ephemeral</td><td>Inlined as a CTE, never persisted</td></tr>
+        </table>
+        <pre><code class="language-sql" data-trim>
+{{ config(materialized='table') }}
+
+select ...
+        </code></pre>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt example: a small project</h2>
+        <p class="small">Declare the raw sources, with freshness expectations and tests:</p>
+        <pre><code class="language-yaml" data-trim data-line-numbers="1-7|8-16">
+# models/staging/_sources.yml
+version: 2
+sources:
+  - name: jaffle
+    schema: raw_jaffle
+    tables:
+      - name: orders
+        freshness:
+          warn_after: {count: 12, period: hour}
+          error_after: {count: 24, period: hour}
+        loaded_at_field: _loaded_at
+        columns:
+          - name: id
+            data_tests:
+              - unique
+              - not_null
+        </code></pre>
+        <aside class="notes">
+          OPTIONAL &mdash; safe to skip if running long. The freshness block is the interesting part;
+          everything else is boilerplate.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt example: staging model</h2>
+        <pre><code class="language-sql" data-trim data-line-numbers>
+-- models/staging/stg_orders.sql
+{{ config(materialized='view') }}
+
+select
+    id                   as order_id,
+    user_id              as customer_id,
+    cast(order_date as date) as order_date,
+    lower(status)        as status,
+    {{ cents_to_dollars('amount_cents') }} as amount_usd
+from {{ source('jaffle', 'orders') }}
+where status != 'deleted'
+        </code></pre>
+        <p class="small">Convention: <code>stg_*</code> models are 1:1 with a source table</p>
+      </section>
+
+      <section class="small-code">
+        <h2 class="ruled">dbt example: mart model</h2>
+        <pre><code class="language-sql" data-trim data-line-numbers>
+-- models/marts/fct_customer_orders.sql
+{{ config(materialized='table') }}
+
+with orders as (
+    select * from {{ ref('stg_orders') }}
+),
+customers as (
+    select * from {{ ref('stg_customers') }}
+)
+
+select
+    c.customer_id,
+    c.customer_name,
+    count(o.order_id)      as order_count,
+    sum(o.amount_usd)      as lifetime_value,
+    min(o.order_date)      as first_order_date
+from customers c
+left join orders o on o.customer_id = c.customer_id
+group by 1, 2
+        </code></pre>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt example: tests</h2>
+        <div class="cols tight">
+          <div>
+            <p class="smaller"><strong>Data tests</strong> &mdash; assertions run against real, built data.</p>
+            <pre class="small-code"><code class="language-yaml" data-trim>
+# models/marts/_models.yml
+models:
+  - name: fct_customer_orders
+    columns:
+      - name: customer_id
+        data_tests:
+          - unique
+          - not_null
+      - name: lifetime_value
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+            </code></pre>
+          </div>
+          <div>
+            <p class="smaller"><strong>Unit tests</strong> (dbt 1.8+) &mdash; fixed inputs, expected outputs, no warehouse data needed.</p>
+            <pre class="small-code"><code class="language-yaml" data-trim>
+unit_tests:
+  - name: test_amount_conversion
+    model: stg_orders
+    given:
+      - input: source('jaffle', 'orders')
+        rows:
+          - {id: 1, amount_cents: 1050,
+             status: 'SHIPPED'}
+    expect:
+      rows:
+          - {order_id: 1, amount_usd: 10.50,
+             status: 'shipped'}
+            </code></pre>
+          </div>
+        </div>
+        <aside class="notes">
+          Data tests are post-hoc: build it, then query it and see if the query returns rows.
+          Unit tests arrived in 2024, six years after the tool.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt example: running it</h2>
+        <pre><code class="language-bash" data-trim data-line-numbers="1-2|4-5|7-8|10-11|13-14">
+# build everything, in dependency order
+$ dbt run
+
+# run models + tests + seeds + snapshots together
+$ dbt build
+
+# just this model and everything downstream of it
+$ dbt build --select stg_orders+
+
+# only what changed vs. the last production run
+$ dbt build --select "state:modified+" --state ./prod-artifacts
+
+# generate and serve the docs site (DAG viewer)
+$ dbt docs generate &amp;&amp; dbt docs serve
+        </code></pre>
+        <aside class="notes">
+          OPTIONAL &mdash; safe to skip if running long. 
+          Note the state: selector &mdash; it needs you to stash and pass the previous run's
+          manifest.json yourself. Remember this when we get to SQLMesh plan.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">The incremental model</h2>
+        <pre><code class="language-sql" data-trim data-line-numbers="1-6|8-13">
+{{ config(
+    materialized='incremental',
+    unique_key='order_id',
+    incremental_strategy='merge'
+) }}
+
+select * from {{ ref('stg_orders') }}
+
+{% if is_incremental() %}
+  -- only on incremental runs, not the first build
+  where order_date &gt; (select max(order_date) from {{ this }})
+{% endif %}
+        </code></pre>
+        <ul class="fragment smaller">
+          <li>The model now behaves <strong>differently in dev than in prod</strong></li>
+          <li><code>max(order_date)</code> from the target is a <em>proxy</em> for &ldquo;what's missing&rdquo;</li>
+          <li>Miss a day of runs? Nothing tells you. There's no record of which intervals were loaded</li>
+          <li>Need to backfill last March? <code>--full-refresh</code> the whole table, or hand-write a one-off</li>
+        </ul>
+        <aside class="notes">
+          This slide is the hinge of the whole talk. Every pain point SQLMesh addresses is
+          visible right here.
+        </aside>
+      </section>
+
+      <!-- <section>
+        <h2 class="ruled">What dbt gets right</h2>
+        <ul>
+          <li><strong>Approachability</strong> &mdash; if you know SQL, you're productive in an hour</li>
+          <li><strong>Ecosystem</strong> &mdash; packages, adapters for every warehouse, integrations everywhere</li>
+          <li><strong>Hiring</strong> &mdash; &ldquo;dbt&rdquo; is on thousands of resumes; SQLMesh is on hundreds</li>
+          <li><strong>Docs &amp; lineage</strong> &mdash; generated documentation site with a browsable DAG</li>
+          <li><strong>Conventions</strong> &mdash; staging/intermediate/marts is a real, shared vocabulary</li>
+        </ul>
+        <div class="note fragment">
+          Scorecard: <strong>validatable, repeatable, automatable, iterable</strong>.
+          dbt genuinely solved the original problem.
+        </div>
+      </section> -->
+
+      <!-- <section>
+        <h2 class="ruled">Where dbt strains</h2>
+        <ul>
+          <li class="fragment"><strong>It doesn't understand your SQL.</strong> Jinja renders text; the warehouse is the first thing that parses it</li>
+          <li class="fragment"><strong>No column-level lineage</strong> in Core &mdash; dependencies are model-to-model only</li>
+          <li class="fragment"><strong>Dev environments are expensive.</strong> A dev schema means rebuilding tables you didn't change</li>
+          <li class="fragment"><strong>Change impact is your job.</strong> Did that edit break downstream? Run it and find out</li>
+          <li class="fragment"><strong>No state.</strong> dbt doesn't remember what ran, over what time range, or with what code</li>
+          <li class="fragment"><strong>Incremental logic is hand-rolled</strong> &mdash; and therefore hand-broken</li>
+          <li class="fragment"><strong>Scheduling is someone else's problem</strong> &mdash; bring Airflow, Dagster, or dbt Cloud</li>
+        </ul>
+        <aside class="notes">
+          Be fair here: none of these were design mistakes. dbt was built for a world where
+          warehouses were cheap and projects were small. The strain shows at scale.
+        </aside>
+      </section> -->
+
+      <section>
+        <h2 class="ruled">What could be better?</h2>
+        <ul>
+          <li>Better "understanding" of SQL</li>
+          <li>Better handling of incremental runs/state</li>
+          <li>Easier dev vs. prod environment management</li>
+        </ul>
+      </section>
+
+      <!-- ================= PART 3: HISTORY ================= -->
+      <section class="center">
+        <p class="kicker" style="text-align:center;">Part 3</p>
+        <h1>History</h1>
+      </section>
+
+      <section>
+        <h2 class="ruled" style="font-size:1.15em;">A decade of transformation frameworks</h2>
+        <div class="cols tight">
+          <div>
+            <p class="era">The dbt era</p>
+            <ul class="timeline">
+              <li class="fragment"><span class="date">March 9, 2016</span><span class="what">dbt's first commit, under RJMetrics</span></li>
+              <li class="fragment"><span class="date">January 2017</span><span class="what">Sinter launches (future dbt Cloud)</span></li>
+              <li class="fragment"><span class="date">April 2020</span><span class="what">Series A funding</span></li>
+              <li class="fragment"><span class="date">November 2020</span><span class="what">Series B funding</span></li>
+              <li class="fragment"><span class="date">June 2021</span><span class="what">Series C funding</span></li>
+              <li class="fragment"><span class="date">February 2022</span><span class="what">Series D funding&hellip; $4.2B valuation</span></li>
+            </ul>
+          </div>
+          <div>
+            <p class="era">A new foe has appeared?</p>
+            <ul class="timeline">
+              <li class="fragment hollow"><span class="date">September 2022</span><span class="what">SQLMesh's first commit (Tobiko Data)</span></li>
+              <li class="fragment hollow"><span class="date">May 2025</span><span class="what">dbt Fusion announced under ELv2, <em>not</em> OSI open source</span></li>
+              <li class="fragment hollow"><span class="date">September 2025</span><span class="what">Fivetran acquires Tobiko Data (SQLMesh, Tobiko Cloud)</span></li>
+              <li class="fragment hollow"><span class="date">October 13, 2025</span><span class="what">Fivetran + dbt Labs merger announced</span></li>
+              <li class="fragment hollow"><span class="date">March 25, 2026</span><span class="what">Fivetran contributes SQLMesh to the Linux Foundation</span></li>
+              <li class="fragment hollow"><span class="date">June 1, 2026</span><span class="what">Merger closes; dbt Core v2.0 alpha ships the Fusion engine under Apache 2.0</span></li>
+            </ul>
+          </div>
+        </div>
+        <aside class="notes">
+          Walk this left to right. The punchline: as of mid-2026 the same company owns both
+          frameworks &mdash; and has open-sourced or donated both of them.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">The commercialization worry</h2>
+        <ul>
+          <li class="fragment"><strong>May 2025:</strong> dbt Labs announces <strong>Fusion</strong> &mdash; a from-scratch rewrite of dbt in Rust that actually parses SQL. Released under <strong>ELv2</strong>: free to use, but not OSI open source, and you can't build a hosted dbt on it</li>
+          <li class="fragment"><strong>The reaction:</strong> is dbt Core now the slow, deprecated tier? Was the community's work the on-ramp to a proprietary engine?</li>
+          <li class="fragment"><strong>Then the acquisitions:</strong> Fivetran buys Tobiko Data, then merges with dbt Labs. One vendor, both frameworks</li>
+          <li class="fragment"><strong>June 1, 2026:</strong> dbt Core v2.0 alpha &mdash; the Fusion engine, relicensed <strong>Apache 2.0</strong>. One engine for OSS and commercial distributions</li>
+        </ul>
+        <div class="note fragment">
+          The worry that motivated this talk was largely <em>answered</em> in June &mdash; but only after a
+          year of uncertainty, and only under a single vendor's control.
+        </div>
+        <aside class="notes">
+          Be intellectually honest: the licensing story resolved better than most people feared.
+          The concentration story did not.
+        </aside>
+      </section>
+
+      <!-- ================= PART 4: SQLMesh ================= -->
+      <section class="center">
+        <p class="kicker" style="text-align:center;">Part 4</p>
+        <h1>SQLMesh</h1>
+      </section>
+
+      <section>
+        <h2 class="ruled">What is SQLMesh?</h2>
+        <ul>
+          <li>An open-source (Apache 2.0) Python transformation framework, first committed September 2022 by Tobiko Data</li>
+          <li>Now governed by the <strong>Linux Foundation</strong> (March 2026)</li>
+          <li>Deliberately dbt-shaped on the surface: SQL files, a DAG, tests, environments, a CLI</li>
+          <li>Radically different underneath: it <strong>parses and understands your SQL</strong></li>
+        </ul>
+        <div class="note fragment">
+          <strong>The one-sentence version:</strong> SQLMesh treats SQL as
+          <em>code to be compiled</em>, not text to be templated &mdash; and uses that understanding to
+          tell you what your change will break <em>before</em> you run it.
+        </div>
+      </section>
+
+      <section>
+        <h2 class="ruled">The foundation: SQLGlot</h2>
+        <p>SQLMesh is built on <a href="https://github.com/tobymao/sqlglot">SQLGlot</a>, a pure-Python
+          SQL parser, transpiler, and optimizer covering 20+ dialects.</p>
+        <pre><code class="language-python" data-trim data-line-numbers="1-6|8-12">
+&gt;&gt;&gt; import sqlglot
+&gt;&gt;&gt; sqlglot.parse_one("SELECT a FROM tbl").sql()
+'SELECT a FROM tbl'
+
+&gt;&gt;&gt; sqlglot.parse_one("SELECT a FROM tbl")
+Select(expressions=[Column(this=Identifier(this=a))], from=From(...))
+
+&gt;&gt;&gt; sqlglot.transpile(
+...     "SELECT EPOCH_MS(1618088028295)", read="duckdb", write="snowflake"
+... )
+["SELECT TO_TIMESTAMP(1618088028295 / 1000)"]
+        </code></pre>
+        <ul class="fragment smaller">
+          <li>Your SQL becomes an <strong>abstract syntax tree</strong>, not a string</li>
+          <li>That makes column-level lineage, semantic diffs, and cross-engine transpilation possible</li>
+          <li>Typos and invalid column references are caught <em>at plan time</em>, without touching the warehouse</li>
+        </ul>
+        <aside class="notes">
+          SQLGlot predates SQLMesh and is used well outside it. It's the enabling technology
+          for everything that follows.
+        </aside>
+      </section>
+
+      <section class="small-code">
+        <h2 class="ruled">SQLMesh basics: the model</h2>
+        <p>A model is a SQL file too &mdash; but it opens with a declarative <code>MODEL</code> block.</p>
+        <pre><code class="language-sql" data-trim data-line-numbers="1-8|10-16">
+MODEL (
+  name analytics.stg_orders,
+  kind VIEW,
+  cron '@daily',
+  grain order_id,
+  audits (
+    unique_values(columns := (order_id)),
+    not_null(columns := (order_id, customer_id))
+  )
+);
+
+SELECT
+  id::INT                  AS order_id,
+  user_id::INT             AS customer_id,
+  order_date::DATE         AS order_date,
+  LOWER(status)            AS status,
+  amount_cents / 100.0     AS amount_usd
+FROM raw.orders
+WHERE status != 'deleted'
+        </code></pre>
+        <p class="fragment small">Note: no <code>ref()</code>. You write the real table name and SQLMesh
+          resolves it per environment &mdash; it knows what a table reference <em>is</em>.</p>
+      </section>
+
+      <section>
+        <h2 class="ruled">SQLMesh basics: model kinds</h2>
+        <p>Instead of materializations plus hand-written logic, you <strong>declare the semantics</strong>.</p>
+        <table>
+          <tr><th>Kind</th><th>Meaning</th></tr>
+          <tr><td>VIEW</td><td>A view, rebuilt on change</td></tr>
+          <tr><td>FULL</td><td>Rebuilt from scratch every run</td></tr>
+          <tr><td>INCREMENTAL_BY_TIME_RANGE</td><td>Rows belong to time intervals; SQLMesh tracks which intervals exist and fills gaps</td></tr>
+          <tr><td>INCREMENTAL_BY_UNIQUE_KEY</td><td>Upsert on a key</td></tr>
+          <tr><td>SCD_TYPE_2_BY_TIME / _COLUMN</td><td>Slowly changing dimension history, built in</td></tr>
+          <tr><td>SEED</td><td>A CSV loaded as a table</td></tr>
+          <tr><td>EMBEDDED</td><td>Inlined as a CTE (dbt's &ldquo;ephemeral&rdquo;)</td></tr>
+        </table>
+        <aside class="notes">
+          The important shift: SCD Type 2 and incrementality are first-class kinds, not
+          patterns you assemble out of macros.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Incremental models, declared</h2>
+        <pre><code class="language-sql" data-trim data-line-numbers="1-10|12-15">
+MODEL (
+  name analytics.fct_orders,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column order_date,
+    batch_size 30
+  ),
+  start '2024-01-01',
+  cron '@daily',
+  grain order_id
+);
+
+SELECT *
+FROM analytics.stg_orders
+WHERE order_date BETWEEN @start_ds AND @end_ds
+        </code></pre>
+        <ul class="fragment smaller">
+          <li>No <code>is_incremental()</code> branch &mdash; the model runs the <strong>same way</strong> in dev and prod</li>
+          <li><code>@start_ds</code> / <code>@end_ds</code> are the interval being processed, supplied by the framework</li>
+          <li>SQLMesh records <strong>which intervals have been loaded</strong> in its state database</li>
+          <li>Missed three days? It knows, and backfills exactly those three days</li>
+          <li>Want to reload March? <code>sqlmesh plan --restate-model analytics.fct_orders --start 2026-03-01 --end 2026-03-31</code></li>
+        </ul>
+        <aside class="notes">
+          Contrast this directly with the earlier dbt incremental slide. Same job, and the
+          framework is now responsible for correctness instead of the analyst.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Virtual data environments</h2>
+        <p class="small">The idea that makes everything else work: <strong>separate the names people query
+          from the tables that hold data.</strong></p>
+        <div class="cols" style="align-items:stretch; margin-top:0.4em;">
+          <div class="layer">
+            <h4>Virtual layer &mdash; views</h4>
+            <div class="obj">prod.fct_orders</div>
+            <div class="obj">prod.stg_orders</div>
+            <div class="obj fragment" data-fragment-index="1">dev_eddie.fct_orders</div>
+            <div class="obj fragment" data-fragment-index="1">dev_eddie.stg_orders</div>
+          </div>
+          <div class="stack arrow">
+            <div>&rarr;</div>
+          </div>
+          <div class="layer">
+            <h4>Physical layer &mdash; tables</h4>
+            <div class="obj">stg_orders__a1f9c2</div>
+            <div class="obj">fct_orders__7bd104</div>
+            <div class="obj fragment ghost" data-fragment-index="2">stg_orders__c8e330 &nbsp;(new)</div>
+          </div>
+        </div>
+        <ul class="smaller">
+          <li class="fragment" data-fragment-index="1">A new environment is just a <strong>set of views</strong> pointing at existing tables &mdash; created in seconds, costs nothing</li>
+          <li class="fragment" data-fragment-index="2">Change one model, and only <em>that</em> model gets a new physical table (fingerprinted by its snapshot)</li>
+          <li class="fragment" data-fragment-index="3">Promoting to prod = <strong>repointing views</strong>. No rebuild, no downtime, instant rollback</li>
+        </ul>
+        <aside class="notes">
+          The killer consequence: the table your dev environment validated is the *exact same
+          table* that prod will point at. You are not rebuilding and hoping it matches.
+        </aside>
+      </section>
+
+      <section class="small-code">
+        <h2 class="ruled">Plan: what would change?</h2>
+        <p class="small">If you've used Terraform, you already know this workflow.</p>
+        <pre><code class="language-text" data-trim data-line-numbers="1-8|9-14|15-17">
+$ sqlmesh plan dev
+
+Differences from the `dev` environment:
+
+Models:
+└── Directly Modified: analytics.stg_orders
+    └── Indirectly Modified Children:
+        └── analytics.fct_orders
+
+---
++++
+@@ -3,6 +3,7 @@
+   order_date::DATE     AS order_date,
++  LOWER(status)        AS status,
+   amount_cents / 100.0 AS amount_usd
+
+Directly Modified: analytics.stg_orders (Non-breaking)
+└── analytics.fct_orders (Indirect Non-breaking)
+        </code></pre>
+        <aside class="notes">
+          Three things to point at: the semantic diff of the SQL itself, the automatic
+          breaking/non-breaking classification, and the fact that nothing has run yet.
+        </aside>
+      </section>
+
+      <section class="small-code">
+        <h2 class="ruled">Apply: pay only for what changed</h2>
+        <pre><code class="language-text" data-trim data-line-numbers="1-8|10-16">
+Models needing backfill:
+└── analytics.stg_orders: [2024-01-01 - 2026-08-10]
+
+Apply - Backfill Tables [y/n]: y
+Creating physical tables    ━━━━━━━━━━ 100%
+stg_orders [insert]         ━━━━━━━━━━ 100%
+Virtually updating 'dev'    ━━━━━━━━━━ 100%
+The target environment has been updated successfully
+
+$ sqlmesh plan prod
+
+Differences from the `prod` environment:
+└── analytics.stg_orders (Non-breaking)
+
+Apply - Virtual Update [y/n]: y
+Virtually updating 'prod'   ━━━━━━━━━━ 100%
+The target environment has been updated successfully  (0.4s)
+        </code></pre>
+        <div class="note fragment">
+          Promoting to prod re-used the table dev already validated. <strong>No backfill.
+          Sub-second.</strong> That is the whole point of the virtual layer.
+        </div>
+        <aside class="notes">
+          The second command is the payoff. In dbt, promoting to prod means running the
+          models again in prod and hoping the result matches what you saw in dev.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Breaking vs. non-breaking</h2>
+        <p>SQLMesh diffs the <strong>AST</strong>, not the text, and classifies every change.</p>
+        <div class="cols">
+          <div>
+            <h3>Non-breaking</h3>
+            <ul class="smaller">
+              <li>Adding a column no one downstream reads</li>
+              <li>Changing a comment or formatting</li>
+              <li>Result: rebuild <em>only</em> this model; children keep their existing tables</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Breaking</h3>
+            <ul class="smaller">
+              <li>Changing the logic behind a column that downstream models consume</li>
+              <li>Removing or retyping a referenced column</li>
+              <li>Result: rebuild this model <em>and</em> the affected children</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note fragment">
+          You can always override the classification. But the default is computed from
+          <strong>column-level lineage</strong> &mdash; and the compute you don't spend is real money.
+        </div>
+        <aside class="notes">
+          In dbt this decision is made by a human with a `--select model+` and a guess.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Forward-only and dev previews</h2>
+        <ul>
+          <li><strong>Forward-only plans</strong> &mdash; for huge tables you can't afford to rebuild: apply the change going forward, leave history as-is</li>
+          <li><strong>Dev previews</strong> &mdash; SQLMesh can build a dev version over a small date window, so you validate on a day of data, not five years</li>
+          <li><code>sqlmesh table_diff prod:dev analytics.fct_orders</code> &mdash; row and column level data diff between two environments, before you merge</li>
+        </ul>
+        <pre class="fragment"><code class="language-bash" data-trim>
+$ sqlmesh plan dev --start '2026-08-01' --end '2026-08-10'
+$ sqlmesh table_diff prod:dev analytics.fct_orders --show-sample
+        </code></pre>
+        <div class="note fragment">
+          This is the answer to &ldquo;my dev run costs $400 and takes two hours.&rdquo;
+        </div>
+        <aside class="notes">
+          OPTIONAL &mdash; safe to skip if running long. table_diff is the one to mention if you only
+          have time for a sentence.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Testing: audits and unit tests</h2>
+        <div class="cols tight">
+          <div>
+            <p class="smaller"><strong>Audits</strong> &mdash; assertions against built data (dbt's data tests), declared inline or reusable.</p>
+            <pre class="small-code"><code class="language-sql" data-trim>
+-- audits/no_negative_amounts.sql
+AUDIT (
+  name assert_positive_amount,
+  dialect duckdb
+);
+
+SELECT *
+FROM @this_model
+WHERE amount_usd &lt; 0
+            </code></pre>
+          </div>
+          <div>
+            <p class="smaller"><strong>Unit tests</strong> &mdash; fixture in, expected out. Run in milliseconds against DuckDB, no warehouse needed.</p>
+            <pre class="small-code"><code class="language-yaml" data-trim>
+test_stg_orders:
+  model: analytics.stg_orders
+  inputs:
+    raw.orders:
+      - id: 1
+        amount_cents: 1050
+        status: 'SHIPPED'
+  outputs:
+    query:
+      - order_id: 1
+        amount_usd: 10.50
+        status: 'shipped'
+            </code></pre>
+          </div>
+        </div>
+        <p class="fragment small"><code>sqlmesh test</code> runs unit tests; audits run automatically as part of
+          <code>plan</code> and <code>run</code>, and can <strong>block</strong> a promotion.</p>
+        <aside class="notes">
+          Unit tests were in SQLMesh from very early on, not bolted on six years later.
+        </aside>
+      </section>
+
+      <section class="small-code">
+        <h2 class="ruled">Python models and macros</h2>
+        <p class="small">When SQL isn't enough, drop into Python &mdash; a first-class model type, not an escape hatch.</p>
+        <pre><code class="language-python" data-trim data-line-numbers="1-12|14-22">
+from sqlmesh import model, ExecutionContext
+import pandas as pd
+import typing as t
+from datetime import datetime
+
+@model(
+    "analytics.customer_segments",
+    columns={"customer_id": "int", "segment": "text"},
+    kind="FULL",
+    cron="@daily",
+)
+def execute(
+    context: ExecutionContext,
+    start: datetime,
+    end: datetime,
+    execution_time: datetime,
+    **kwargs: t.Any,
+) -&gt; pd.DataFrame:
+    table = context.resolve_table("analytics.fct_customer_orders")
+    df = context.fetchdf(f"SELECT customer_id, lifetime_value FROM {table}")
+    df["segment"] = pd.cut(df.lifetime_value, [0, 100, 1000, 1e9],
+                           labels=["low", "mid", "whale"])
+    return df[["customer_id", "segment"]]
+        </code></pre>
+        <p class="fragment small">Python <strong>macros</strong> (<code>@macro</code>) also exist &mdash; but they manipulate the
+          <em>SQL AST</em>, so SQLMesh still understands the result. Jinja is supported for dbt compatibility.</p>
+        <aside class="notes">
+          OPTIONAL &mdash; safe to skip if running long. For a Python meetup this one usually earns its
+          place &mdash; keep it if the room is engaged.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Built-in scheduling</h2>
+        <ul>
+          <li>Every model declares its own <code>cron</code> &mdash; cadence is a property of the model, not of an external DAG you maintain in parallel</li>
+          <li><code>sqlmesh run</code> evaluates whatever is due, fills any missing intervals, and stops</li>
+          <li>Put that one command on cron/systemd/GitHub Actions and you have a scheduler</li>
+          <li>Or plug into Airflow, Dagster, or Prefect when you need to sit inside a bigger pipeline</li>
+        </ul>
+        <pre class="fragment"><code class="language-bash" data-trim>
+$ sqlmesh run          # run what's due, backfill any gaps
+$ sqlmesh ui           # browser IDE: editor, DAG, column-level lineage
+$ sqlmesh dlt_refresh  # / sqlmesh migrate, format, lint, audit, test ...
+        </code></pre>
+        <div class="note fragment">
+          dbt Core needs an orchestrator to be useful in production. SQLMesh ships with enough
+          scheduling to not need one on day one.
+        </div>
+      </section>
+
+      <section>
+        <h2 class="ruled">SQLMesh runs your dbt project</h2>
+        <p>Migration isn't all-or-nothing &mdash; SQLMesh can read a dbt project directly.</p>
+        <pre><code class="language-bash" data-trim data-line-numbers="1-5|7-9">
+# point SQLMesh at an existing dbt project
+$ sqlmesh init -t dbt
+$ sqlmesh plan
+# refs, sources, macros, seeds, tests, and profiles.yml are read as-is
+
+# or convert the project to native SQLMesh models
+$ sqlmesh migrate
+        </code></pre>
+        <ul class="fragment smaller">
+          <li>You keep your Jinja, your <code>ref()</code>s, and your dbt packages</li>
+          <li>You gain virtual environments, plan/apply, and interval tracking</li>
+          <li>Coverage is good but not total &mdash; exotic macros and adapter-specific tricks need review</li>
+        </ul>
+        <aside class="notes">
+          This was a deliberate adoption strategy: meet dbt users where they are.
+        </aside>
+      </section>
+
+      <!-- ================= PART 5: COMPARISON ================= -->
+      <section class="center">
+        <p class="kicker" style="text-align:center;">Part 5</p>
+        <h1>Direct comparison</h1>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt vs. SQLMesh: technical</h2>
+        <table>
+          <tr><th></th><th>dbt</th><th>SQLMesh</th></tr>
+          <tr><td>SQL handling</td><td>Jinja text templating (v1); Rust SQL comprehension (v2/Fusion)</td><td>SQLGlot AST parsing from day one</td></tr>
+          <tr><td>Lineage</td><td>Model-to-model (column-level in Fusion/Cloud)</td><td>Column-level, in the OSS core</td></tr>
+          <tr><td>Change impact</td><td>You decide with <code>--select</code>; <code>state:modified</code> needs stored artifacts</td><td>Semantic diff auto-classifies breaking vs. non-breaking</td></tr>
+          <tr><td>Dev environments</td><td>Separate schema; rebuild what you want to test</td><td>Virtual environments; views repointed, near-zero cost</td></tr>
+          <tr><td>Incrementality</td><td><code>is_incremental()</code> written by hand</td><td>Declarative model kinds; framework owns the logic</td></tr>
+          <tr><td>State</td><td>None &mdash; artifacts only</td><td>State DB tracks snapshots and loaded intervals</td></tr>
+          <tr><td>Backfills</td><td>Manual or <code>--full-refresh</code></td><td>Gap detection + targeted restatement</td></tr>
+          <tr><td>Deployment</td><td>Rebuild in prod</td><td>Promote validated tables by repointing views</td></tr>
+        </table>
+      </section>
+
+      <section>
+        <h2 class="ruled">dbt vs. SQLMesh: practical</h2>
+        <table>
+          <tr><th></th><th>dbt</th><th>SQLMesh</th></tr>
+          <tr><td>Testing</td><td>Data tests since day one; unit tests since 1.8 (2024)</td><td>Audits + unit tests, both early</td></tr>
+          <tr><td>Scheduling</td><td>External: Airflow, Dagster, dbt platform</td><td>Built-in per-model cron; integrates with Airflow/Dagster/Prefect</td></tr>
+          <tr><td>Portability</td><td>Adapter per warehouse; SQL is dialect-specific</td><td>Transpiles across 20+ dialects via SQLGlot</td></tr>
+          <tr><td>Python</td><td>Python models on some warehouses</td><td>Python models + AST-aware Python macros</td></tr>
+          <tr><td>License</td><td>Apache 2.0 (Core v1 and v2)</td><td>Apache 2.0</td></tr>
+          <tr><td>Governance</td><td>Fivetran (post-merger, June 2026)</td><td>Linux Foundation (March 2026)</td></tr>
+          <tr><td>Ecosystem</td><td>Enormous: packages, adapters, integrations, jobs</td><td>Small but real; can run dbt projects</td></tr>
+          <tr><td>Learning curve</td><td>Low &mdash; it's just SQL files</td><td>Moderate &mdash; new mental model, thinner docs and Stack Overflow</td></tr>
+        </table>
+      </section>
+
+      <section>
+        <h2 class="ruled">The philosophical difference</h2>
+        <div class="cols">
+          <div>
+            <h3>dbt</h3>
+            <ul class="smaller">
+              <li>SQL is <strong>text to be templated</strong></li>
+              <li>The framework orchestrates; <strong>the human owns correctness</strong></li>
+              <li>Optimizes for approachability and ecosystem</li>
+              <li>Conventions over guarantees</li>
+            </ul>
+          </div>
+          <div>
+            <h3>SQLMesh</h3>
+            <ul class="smaller">
+              <li>SQL is <strong>code to be compiled</strong></li>
+              <li>The human declares intent; <strong>the framework owns correctness</strong></li>
+              <li>Optimizes for safety and compute cost</li>
+              <li>Guarantees over conventions</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note fragment">
+          Notice that dbt v2/Fusion &mdash; Rust, real SQL parsing, column-level lineage,
+          state-aware orchestration &mdash; is converging on SQLMesh's thesis.
+          <strong>SQLMesh won the argument. It's less clear that it won the market.</strong>
+        </div>
+        <aside class="notes">
+          This is the line to land the talk on. Say it slowly.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Where does that leave us?</h2>
+        <ul>
+          <li>SQLMesh offers a promising technological advancement on transformation framework design</li>
+          <li>SQLMesh development activity decreased dramatically after Tobiko Data was acquired by Fivetran</li>
+        </ul>
+        <img src="assets/sqlmesh-commits.png" style="width:78%; border:1px solid #ccc;" alt="Weekly commit chart for the SQLMesh repository from December 2024 to August 2026, showing a steep drop after September 2025">
+        <p class="small" style="margin-top:0.3em;">Weekly commits, SQLMesh repo &mdash; the cliff is the September 2025 acquisition.</p>
+        <aside class="notes">
+          Let this chart sit for a beat. It's the single most persuasive slide in the deck.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Where does that leave us? (cont.)</h2>
+        <ul>
+          <li class="fragment">The SQLMesh donation to the Linux Foundation is promising, but it's too early to tell the direction things will go</li>
+          <li class="fragment">Neutral governance is not the same as engineering investment. Named members are on board; sustained contribution is the thing to watch</li>
+          <li class="fragment">Meanwhile dbt Core v2 answered the licensing complaint &mdash; Apache 2.0, one engine, no OSS/commercial split in the runtime</li>
+          <li class="fragment"><strong>For now, dbt Core is still the safe bet for new projects if a transformation framework is desired</strong></li>
+        </ul>
+        <div class="note fragment">
+          The irony worth sitting with: the talk that started as &ldquo;dbt is over-commercializing,
+          here's the alternative&rdquo; ends with both projects owned or seeded by the same company,
+          and both under permissive licenses.
+        </div>
+      </section>
+
+      <section>
+        <h2 class="ruled">So which should you pick?</h2>
+        <div class="cols">
+          <div>
+            <h3>Reach for dbt when&hellip;</h3>
+            <ul class="smaller">
+              <li>You're starting fresh and want the shortest path to value</li>
+              <li>Your team is SQL-literate but not engineering-heavy</li>
+              <li>You depend on the package/integration ecosystem</li>
+              <li>You need to hire for it</li>
+              <li>Your warehouse bill isn't the problem</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Reach for SQLMesh when&hellip;</h3>
+            <ul class="smaller">
+              <li>Rebuild cost is a real line item</li>
+              <li>You have many contributors and need change safety</li>
+              <li>Correct backfills and late-arriving data actually matter</li>
+              <li>You're multi-engine, or expect to migrate engines</li>
+              <li>You want scheduling without standing up Airflow</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note fragment">
+          And a third option: <strong>run SQLMesh on your existing dbt project</strong> for a week.
+          It's the cheapest way to find out which set of problems you actually have.
+        </div>
+      </section>
+
+      <!-- ================= PART 6: DEMOS ================= -->
+      <section class="center">
+        <p class="kicker" style="text-align:center;">Part 6</p>
+        <h1>Demos</h1>
+      </section>
+
+      <section>
+        <h2 class="ruled">Demo 1 &mdash; dbt</h2>
+        <ol class="small">
+          <li>Tour the project: <code>models/</code>, <code>_sources.yml</code>, a staging model, a mart</li>
+          <li><code>dbt build</code> &mdash; watch the DAG execute in dependency order</li>
+          <li>Show <code>target/compiled/</code> &mdash; the Jinja is gone, it's just SQL</li>
+          <li>Break a test on purpose, re-run, read the failure</li>
+          <li>Add a column to a staging model &mdash; what do I have to rebuild? How do I know?</li>
+          <li><code>dbt docs generate &amp;&amp; dbt docs serve</code> &mdash; the lineage graph</li>
+        </ol>
+        <aside class="notes">
+          Keep to ~5 minutes. The point of step 5 is to set up the SQLMesh demo.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Demo 2 &mdash; SQLMesh</h2>
+        <ol class="small">
+          <li><code>sqlmesh plan</code> on a fresh project &mdash; initial backfill, prod created</li>
+          <li>Edit a model, then <code>sqlmesh plan dev</code> &mdash; read the semantic diff and the
+            <em>Non-breaking</em> classification</li>
+          <li>Apply it: only the changed model backfills; dev is a virtual environment</li>
+          <li><code>sqlmesh table_diff prod:dev</code> &mdash; see the actual data delta</li>
+          <li><code>sqlmesh plan prod</code> &mdash; a <strong>virtual update</strong>. No rebuild. Seconds</li>
+          <li>Introduce a genuinely breaking change &mdash; watch the classification flip</li>
+          <li><code>sqlmesh ui</code> &mdash; column-level lineage</li>
+        </ol>
+        <aside class="notes">
+          Steps 3 and 5 are the money shots. Make sure the audience sees the timer on the
+          virtual update.
+        </aside>
+      </section>
+
+      <!-- ================= WRAP UP ================= -->
+      <section>
+        <h2 class="ruled">Takeaways</h2>
+        <ul>
+          <li class="fragment">Transformation frameworks exist to make SQL <strong>validatable, repeatable, automatable, and iterable</strong></li>
+          <li class="fragment">dbt made that mainstream by treating SQL as templated text</li>
+          <li class="fragment">SQLMesh argued the framework should <em>understand</em> your SQL &mdash; and got virtual environments, semantic change detection, and correct backfills out of it</li>
+          <li class="fragment">In 2026 both live under Apache 2.0, and dbt v2 has adopted much of SQLMesh's thesis</li>
+          <li class="fragment">Pick dbt for ecosystem and momentum; pick SQLMesh when correctness and compute cost are the constraint</li>
+        </ul>
+        <aside class="notes">
+          OPTIONAL &mdash; safe to skip if running long. Redundant with "So which should you pick?" if
+          that slide landed well.
+        </aside>
+      </section>
+
+      <section>
+        <h2 class="ruled">Resources</h2>
+        <ul class="small">
+          <li>dbt docs &mdash; <a href="https://docs.getdbt.com">docs.getdbt.com</a></li>
+          <li>dbt Core v2 announcement &mdash; <a href="https://docs.getdbt.com/blog/dbt-core-v2-is-here">docs.getdbt.com/blog/dbt-core-v2-is-here</a></li>
+          <li>SQLMesh docs &mdash; <a href="https://sqlmesh.readthedocs.io">sqlmesh.readthedocs.io</a></li>
+          <li>SQLMesh on GitHub &mdash; <a href="https://github.com/SQLMesh/sqlmesh">github.com/SQLMesh/sqlmesh</a></li>
+          <li>SQLGlot &mdash; <a href="https://github.com/tobymao/sqlglot">github.com/tobymao/sqlglot</a></li>
+          <li>Linux Foundation welcomes SQLMesh &mdash; <a href="https://www.linuxfoundation.org/press/linux-foundation-welcomes-sqlmesh-project">linuxfoundation.org/press</a></li>
+          <li>Fivetran + dbt Labs merger &mdash; <a href="https://www.fivetran.com/press/fivetran-dbt-labs-complete-merger-to-create-the-data-infrastructure-for-trusted-ai-agents">fivetran.com/press</a></li>
+          <li>Data transformation overview &mdash; <a href="https://www.ibm.com/think/topics/data-transformation">ibm.com/think/topics/data-transformation</a></li>
+        </ul>
+      </section>
+
+      <section class="center">
+        <h1>Questions?</h1>
+        <p style="text-align:center; margin-top:1.2em;">Eddie Cosma &nbsp;&middot;&nbsp; CLEpy &nbsp;&middot;&nbsp; August 11, 2026</p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/plugin/notes/notes.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/plugin/highlight/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/plugin/zoom/zoom.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/plugin/search/search.min.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'fade',
+      transitionSpeed: 'fast',
+      backgroundTransition: 'none',
+      width: 1280,
+      height: 720,
+      margin: 0.06,
+      minScale: 0.2,
+      maxScale: 2.0,
+      navigationMode: 'default',
+      plugins: [RevealHighlight, RevealNotes, RevealZoom, RevealSearch],
+    });
+  </script>
+</body>
+
+</html>
